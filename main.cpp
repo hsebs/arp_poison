@@ -289,15 +289,39 @@ void packetRedirector(u_char *param, const struct pcap_pkthdr *header, const u_c
     root->getSourceAddress(srcAddr,10);
     root->getDestinationAddress(dstAddr,10);
 
-    //target to gateway
-    if(memcmp(srcAddr,targetMacAddress,6)==0 && memcmp(dstAddr,myMacAddress,6)==0)
+    if(*(u_int32_t*)targetMacAddress != *(u_int32_t*)myMacAddress)
     {
-        ((EthernetManager*)root)->setAddresss(myMacAddress,gatewayMacAddress);
-        root->getRawStream(data,5000);
-        printf("Len : %d\n",root->getRawStreamLength());
-        if(pcap_sendpacket(adhandle,data,root->getRawStreamLength()))
-            fprintf(stderr,"error\n");
+        //target to gateway
+        if(memcmp(srcAddr,targetMacAddress,6)==0 && memcmp(dstAddr,myMacAddress,6)==0)
+        {
+            ((EthernetManager*)root)->setAddresss(myMacAddress,gatewayMacAddress);
+            root->getRawStream(data,5000);
+            printf("Len : %d\n",root->getRawStreamLength());
+            if(pcap_sendpacket(adhandle,data,root->getRawStreamLength()))
+                fprintf(stderr,"error\n");
+        }
+
+        //gateway to target
+        if(memcmp(srcAddr,gatewayMacAddress,6)==0 && memcmp(dstAddr,myMacAddress,6)==0)
+        {
+            protocolManager=root->getSubProtocolManager();
+            protocolManager->getProtocolTypeAsString(type,25);
+            if(strcmp(type,"IP")==0)
+            {
+                protocolManager->getDestinationAddress(dstAddr,16);
+                if(memcmp(dstAddr,targetIpv4Address,4)==0)
+                {
+                    ((EthernetManager*)root)->setAddresss(myMacAddress,targetMacAddress);
+                    root->getRawStream(data,5000);
+                    printf("Len : %d\n",root->getRawStreamLength());
+                    if(pcap_sendpacket(adhandle,data,root->getRawStreamLength()))
+                        fprintf(stderr,"error\n");
+                }
+            }
+        }
     }
+
+
 
     //my to gateway (for windows)
     if(memcmp(srcAddr,myMacAddress,6)==0 && memcmp(dstAddr,myMacAddress,6)==0)
@@ -309,24 +333,6 @@ void packetRedirector(u_char *param, const struct pcap_pkthdr *header, const u_c
             fprintf(stderr,"error\n");
     }
 
-    //gateway to target
-    if(memcmp(srcAddr,gatewayMacAddress,6)==0 && memcmp(dstAddr,myMacAddress,6)==0)
-    {
-        protocolManager=root->getSubProtocolManager();
-        protocolManager->getProtocolTypeAsString(type,25);
-        if(strcmp(type,"IP")==0)
-        {
-            protocolManager->getDestinationAddress(dstAddr,16);
-            if(memcmp(dstAddr,targetIpv4Address,4)==0)
-            {
-                ((EthernetManager*)root)->setAddresss(myMacAddress,targetMacAddress);
-                root->getRawStream(data,5000);
-                printf("Len : %d\n",root->getRawStreamLength());
-                if(pcap_sendpacket(adhandle,data,root->getRawStreamLength()))
-                    fprintf(stderr,"error\n");
-            }
-        }
-    }
     delete root;
 
 }
